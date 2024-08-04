@@ -6,7 +6,7 @@ ws.onmessage = (event) => {
   message.textContent = event.data;
   notifications.appendChild(message);
 
-  fetch('http://your-esp32-address/notify', {
+  fetch('http://192.168.1.179/', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
