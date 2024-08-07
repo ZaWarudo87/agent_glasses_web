@@ -1,13 +1,144 @@
 <!DOCTYPE html>
+<html>
 <head>
+  <title>Stock Search</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Notification Receiver</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+    }
+    small{
+        font-size: 0.7em;
+        color: #444;
+    }
+    .container {
+      width: 90%;
+      max-width: 600px;
+      margin: auto;
+      padding: 20px;
+    }
+    .search-box {
+      position: relative;
+    }
+    .autocomplete-items {
+      position: absolute;
+      background-color: #fafafa;
+      border-top: none;
+      z-index: 99;
+      top: 100%;
+      left: 0;
+      right: 0;
+      font-size: 0.9em;
+    }
+    .autocomplete-item {
+      padding: 10px;
+      cursor: pointer;
+    }
+    .autocomplete-item:hover {
+      background-color: #ddd;
+    }
+    #stockInput{
+        font-size: 1em;
+    }
+  </style>
 </head>
 <body>
-  <h1>Notification Receiver</h1>
-  <div id="notifications"></div>
+  <div class="container">
+    <h2>Stock Search</h2>
+    <div class="search-box">
+      <input type="text" id="stockInput" placeholder="Type a stock symbol...">
+      <div id="autocomplete-list" class="autocomplete-items"></div>
+      <button onclick="clickSearch()">Search</button>
+    </div>
+    <hr>
+    <h3>Stock Information</h3>
+    <p>Name: <span id="name">-</span></p>
+    <p>Open: <span id="openPrice">-</span></p>
+    <p>High: <span id="highPrice">-</span></p>
+    <p>Low: <span id="lowPrice">-</span></p>
+    <p>Close: <span id="closePrice">-</span></p>
+    <p>Current: <span id="currentPrice">-</span></p>
+  </div>
 
-  <script src="main.js"></script>
+  <script>
+    let stockSymbol = "", gmt;
+    const curr = setInterval(function() {
+        if(stockSymbol != "" && isMarketOpen())
+            searchStock();
+    }, 10000);
+
+    document.getElementById('stockInput').addEventListener('input', function() {
+      const query = this.value;
+      if (query.length > 1) {
+        fetch(`https://agentglasses.onrender.com/autocomplete?query=${query}`)
+          .then(response => response.json())
+          .then(data => {
+            const autocompleteList = document.getElementById('autocomplete-list');
+            autocompleteList.innerHTML = '';
+            data.forEach(stock => {
+              const item = document.createElement('div');
+              item.classList.add('autocomplete-item');
+              item.innerHTML = `${stock.symbol}&emsp;<small>${stock.name}</small>`;
+              item.addEventListener('click', () => {
+                document.getElementById('stockInput').value = stock.symbol;
+                autocompleteList.innerHTML = '';
+              });
+              autocompleteList.appendChild(item);
+            });
+          });
+      } else {
+        document.getElementById('autocomplete-list').innerHTML = '';
+      }
+    });
+
+    function searchStock() {
+      fetch(`https://agentglasses.onrender.com/stock?symbol=${stockSymbol}`)
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('name').innerText = data.name;
+          document.getElementById('openPrice').innerText = data.open;
+          document.getElementById('highPrice').innerText = data.high;
+          document.getElementById('lowPrice').innerText = data.low;
+          document.getElementById('closePrice').innerText = data.close;
+          document.getElementById('currentPrice').innerText = data.current;
+          gmt = data.gmt;
+          
+          /*
+          // send to ESP32
+          fetch('/update-stock', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+          });
+          */
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    function clickSearch() {
+        stockSymbol = document.getElementById('stockInput').value;
+        searchStock();
+    }
+
+    function isMarketOpen() {
+        const now = new Date();
+        const local = now.getTimezoneOffset() * 60000;
+
+        let minutes = now.getMinutes();
+        let hours = now.getHours() + (local + gmt) / (60 * 60000);
+        let day = now.getDay() + (hours < 0 ? -1 : (hours >= 24 ? 1 : 0));
+        hours = (hours + 24) % 24;
+        day = (day + 7) % 7;
+
+        const isWeekday = day >= 1 && day <= 5;
+        const isMarketHours = (hours > 9 || (hours == 9 && minutes >= 0)) && (stockSymbol.search(".TW") ? (hours < 15 || (hours == 14 && minutes <= 30)) : hours < 16);
+        
+        console.log('.');
+        return isWeekday && isMarketHours;
+    }
+  </script>
 </body>
 </html>
